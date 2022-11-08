@@ -1,0 +1,10 @@
+type Item @entity {
+  id: ID!
+  NFTAddress: Bytes!
+  tokenId: BigInt!
+  sellerAddress: Bytes!
+  price: BigInt!
+  blockNumberListed: BigInt!
+  blockNumberBought: BigInt
+  blockNumberCancelled: BigInt
+}
