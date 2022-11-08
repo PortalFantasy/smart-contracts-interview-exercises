@@ -16,26 +16,59 @@ contract NFTMarketplace is ReentrancyGuard, Ownable {
     }
 
     // Events
-    event ItemListed();
+    event ItemListed(
+        address NFTAddress,
+        uint256 tokenId,
+        address sellerAddress
+        uint256 price
+    );
 
-    event ItemCancelled();
+    event ItemCancelled(
+        address NFTAddress,
+        uint256 tokenId,
+        address sellerAddress
+    );
 
-    event ItemBought();
+    event ItemBought(
+        address NFTAddress,
+        uint256 tokenId,
+        address sellerAddress
+        uint256 price,
+    );
+
+    event ItemUpdated(
+        address NFTAddress,
+        uint256 tokenId,
+        address sellerAddress
+        uint256 price,
+    );
 
     // Modifiers
     modifier notListed(
         address NFTAddress,
         uint256 tokenId,
         address owner
-    ) {}
+    ) {
+        require(listings[NFTAddress][tokenId].seller != owner, "NFT already listed by its current owner")
+    }
 
     modifier isNFTOwner(
         address NFTAddress,
         uint256 tokenId,
         address spender
-    ) {}
+    ) {
+        require(
+            IERC721(NFTAddress).ownerOf(tokenId) == spender,
+            "Not NFT owner"
+        );
+    }
 
-    modifier isListed(address NFTAddress, uint256 tokenId) {}
+    modifier isListed(address NFTAddress, uint256 tokenId) {
+        require(
+            bytes(listings[NFTAddress][tokenId]).length > 0,
+            "NFT not listed"
+        );
+    }
 
     // An ERC-20 token that is accepted as payment in the marketplace (e.g. WAVAX)
     address tokenToPay;
@@ -61,6 +94,7 @@ contract NFTMarketplace is ReentrancyGuard, Ownable {
             "Not approved for marketplace"
         );
         listings[NFTAddress][tokenId] = Listing(price, msg.sender);
+        emit ItemListed(NFTAddress, tokenId, msg.sender, price);
     }
 
     function cancelListing(address NFTAddress, uint256 tokenId)
@@ -69,6 +103,7 @@ contract NFTMarketplace is ReentrancyGuard, Ownable {
         isListed(NFTAddress, tokenId)
     {
         delete (listings[NFTAddress][tokenId]);
+        emit ItemCancelled(NFTAddress, tokenId, msg.sender);
     }
 
     function buyItem(address NFTAddress, uint256 tokenId)
@@ -77,19 +112,35 @@ contract NFTMarketplace is ReentrancyGuard, Ownable {
     {
         Listing memory listedItem = listings[NFTAddress][tokenId];
 
-        uint256 amountPaidToSeller = listedItem.price;
+        delete (listings[NFTAddress][tokenId]);
+
+        address royaltyReceiver;
+        uint256 royaltyAmount;
+        (royaltyReceiver, royaltyAmount) = IERC2981(NFTAddress).royaltyInfo(tokenId, listedItem.price);
 
         IERC20(tokenToPay).transferFrom(
             msg.sender,
-            listedItem.seller,
-            amountPaidToSeller
+            address(this),
+            listedItem.price
         );
-        delete (listings[NFTAddress][tokenId]);
+        IERC20(tokenToPay).transferFrom(
+            address(this),
+            listedItem.seller,
+            listedItem.price - royaltyAmount
+        );
+        IERC20(tokenToPay).transferFrom(
+            address(this),
+            royaltyReceiver,
+            royaltyAmount
+        );
+
         IERC721(NFTAddress).safeTransferFrom(
             listedItem.seller,
             msg.sender,
             tokenId
         );
+
+        emit ItemBought(NFTAddress, tokenId, listedItem.seller);
     }
 
     function updateListing(
@@ -103,6 +154,8 @@ contract NFTMarketplace is ReentrancyGuard, Ownable {
     {
         require(newPrice > 0, "Price must be above zero");
         listings[NFTAddress][tokenId].price = newPrice;
+
+        emit ItemUpdated(NFTAddress, tokenId, msg.sender, listedItem.price);
     }
 
     function getListing(address NFTAddress, uint256 tokenId)
