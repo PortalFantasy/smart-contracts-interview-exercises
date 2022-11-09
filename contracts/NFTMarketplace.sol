@@ -120,16 +120,11 @@ contract NFTMarketplace is ReentrancyGuard, Ownable {
 
         IERC20(tokenToPay).transferFrom(
             msg.sender,
-            address(this),
-            listedItem.price
-        );
-        IERC20(tokenToPay).transferFrom(
-            address(this),
             listedItem.seller,
             listedItem.price - royaltyAmount
         );
         IERC20(tokenToPay).transferFrom(
-            address(this),
+            msg.sender,
             royaltyReceiver,
             royaltyAmount
         );
