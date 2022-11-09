@@ -102,8 +102,9 @@ contract NFTMarketplace is ReentrancyGuard, Ownable {
         isNFTOwner(NFTAddress, tokenId, msg.sender)
         isListed(NFTAddress, tokenId)
     {
+        address seller = listings[NFTAddress][tokenId].seller;
         delete (listings[NFTAddress][tokenId]);
-        emit ItemCancelled(NFTAddress, tokenId, msg.sender);
+        emit ItemCancelled(NFTAddress, tokenId, seller);
     }
 
     function buyItem(address NFTAddress, uint256 tokenId)
